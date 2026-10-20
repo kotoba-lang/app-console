@@ -1,0 +1,18 @@
+;; app-console — itonami（dapp）の aiueos アプリ記述子（notes.edn 形）。
+;; 判定コアは aiueos/console_severity.cljk（severity 順序・複合 id・読み取り専用）。
+;; 正本は src/app_console/model.cljk。pure（:effects #{}）。
+{:aiueos/component :app/console-severity
+ :aiueos/kind :app
+ :aiueos/trust :untrusted
+ :aiueos/source "console_severity.cljk"
+ :aiueos/wasm "console_severity.wasm"
+ :aiueos/entry "main"
+ :aiueos/args []
+ :aiueos/imports #{}
+ :aiueos/exports #{:app/main
+                   :app/severity-ok
+                   :app/severity-before
+                   :app/id-composite
+                   :app/command-admissible}
+ :aiueos/effects #{}
+ :aiueos/limits {:memory-pages 16 :fuel 5000000}}

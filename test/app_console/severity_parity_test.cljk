@@ -1,0 +1,24 @@
+(ns app-console.severity-parity-test
+  "aiueos/console_severity.cljk（判定コア）と実物の model.cljk の parity。
+  severity の順序・rank 比較・複合 id・読み取り専用が一致する。"
+  (:require [clojure.test :refer [deftest is testing]]
+            [app-console.model :as model]))
+
+(deftest severity-matches-guest
+  (testing "guest test-levels: 6 段の順序付き集合（debug .. fault）"
+    (is (= [:debug :info :notice :warn :error :fault] model/levels)))
+  (testing "guest test-order: rank 比較（文字列順ではない）"
+    (is (= 0 (get model/level-rank :debug)))
+    (is (= 5 (get model/level-rank :fault)))
+    (is (< (get model/level-rank :info) (get model/level-rank :error)))))
+
+(deftest surface-matches-guest
+  (testing "guest test-command: 読み取り専用（書き込み・シグナル・削除は無い）"
+    (is (= "log/read" model/capability))
+    (is (= #{:copy-path :export} model/commands)))
+  (testing "guest test-id: id は [timestamp, seq] の複合（衝突防止）"
+    (let [item (model/entry->item {:timestamp 100 :seq 7 :level :info
+                                   :subsystem "s" :process "p" :message "m"})]
+      (is (= [100 7] (:item/id item)))
+      ;; entry->item は level-rank を severity として計算して載せる
+      (is (= 1 (get-in item [:item/attrs :severity]))))))
