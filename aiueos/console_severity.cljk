@@ -1,0 +1,64 @@
+(ns console.severity
+  "console 判定コア — itonami dapp bundle（pure, :effects #{}）。
+
+  ログエントリの severity・id・コマンド判定（正本:
+  src/app_console/model.cljk）:
+
+  - **severity は 6 段の順序付き集合**: debug(0) / info(1) / notice(2) /
+    warn(3) / error(4) / fault(5)。**文字列ソートでは error が info の前に
+    並び severity 順に見えるが違う** —— 順序はこの並びでしか決まらない。
+  - **id は [timestamp, seq] の複合**。「タイムスタンプは衝突する —— 一瞬の
+    ログの噴出は同じミリ秒を共有する。衝突する id は 2 行を 1 行にし、
+    後から来た方を黙って失う」。
+  - **log/read のみ・構造的に読み取り専用**: コマンドは copy-path / export
+    のみ（書き込み・シグナル・削除は無い。「変更できるログ viewer は
+    別のもっと危険なプログラム」）。
+
+  severity-ok: 1 = 0..5 の内
+  severity-before: 1 = a の方が軽い（rank 比較。文字列順ではない）
+  id-composite: 1 = timestamp と seq の複合 / 0 = 単独（衝突危険）
+  command-admissible: 1 = 0..1（copy-path/export）の内
+
+  実行 host はスカラーのみ = KIR v3 / i64/direct ABI（kernel/selfhost 両対応）。
+
+  テストはゼロ引数 test-*、戻り 1/0:
+  <amu> test aiueos/console_severity.cljk"
+  (:export [main severity-ok severity-before id-composite command-admissible
+            test-levels test-order test-id test-command test-fail-closed]))
+
+(defn main [] :i64
+  0)
+
+(defn severity-ok [code :i64] :i64
+  (if (and (>= code 0) (<= code 5)) 1 0))
+
+(defn severity-before [a :i64 b :i64] :i64
+  (if (and (= (severity-ok a) 1) (= (severity-ok b) 1) (< a b)) 1 0))
+
+(defn id-composite [has-timestamp :i64 has-seq :i64] :i64
+  (if (and (= has-timestamp 1) (= has-seq 1)) 1 0))
+
+(defn command-admissible [cmd :i64] :i64
+  (if (and (>= cmd 0) (<= cmd 1)) 1 0))
+
+;; --- tests（戻り 1 = pass） ------------------------------------------------
+
+(defn test-levels [] :i64
+  ;; debug .. fault の 6 段
+  (if (= (+ (severity-ok 0) (severity-ok 5) (severity-ok 6) (severity-ok -1)) 2) 1 0))
+
+(defn test-order [] :i64
+  ;; rank 比較（文字列順ではない: error(4) より info(1) が軽い）
+  (if (= (+ (severity-before 1 4) (severity-before 4 1) (severity-before 2 2)) 1) 1 0))
+
+(defn test-id [] :i64
+  ;; timestamp + seq の複合のみ衝突しない
+  (if (= (+ (id-composite 1 1) (id-composite 1 0) (id-composite 0 1)) 1) 1 0))
+
+(defn test-command [] :i64
+  ;; copy-path / export のみ（書き込み・シグナル・削除は無い）
+  (if (= (+ (command-admissible 0) (command-admissible 1) (command-admissible 2)) 2) 1 0))
+
+(defn test-fail-closed [] :i64
+  ;; 集合外の severity は比較にも出さない
+  (if (= (+ (severity-before 9 1) (severity-before 1 9)) 0) 1 0))
